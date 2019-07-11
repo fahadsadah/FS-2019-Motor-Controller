@@ -1,3 +1,5 @@
+#include <TimerOne.h>
+
 #define currentSensor 0
 #define apps1 1
 #define apps2 2
@@ -6,7 +8,9 @@
 #define readyToDriveLight 3
 #define brakeLightSwitch 4
 #define motorOutput 5
+#define speaker 6
 
+int soundTimer = 0;
 volatile bool readyToDrive = false;
 
 void setup() {
@@ -21,21 +25,37 @@ void setup() {
     pinMode(readyToDriveLight, OUTPUT);
     pinMode(brakeLightSwitch, INPUT);
     pinMode(motorOutput, OUTPUT);
+    pinMode(speaker, OUTPUT);
 
     TCCR0B = TCCR0B & B11111000 | B00000001; // for PWM frequency of 62500.00 Hz
 
     attachInterrupt(digitalPinToInterrupt(2), checkReadyToDriveSwitch, CHANGE);
+
+    Timer1.initialize(1500000);
+    Timer1.attachInterrupt(timer);
 }
 
 void checkReadyToDriveSwitch() {
     if (digitalRead(readyToDriveSwitch) == LOW) { // RTD switched off
         analogWrite(motorOutput, 0); //cut the power
+        digitalWrite(speaker, LOW); //cancel the ready sound
 
         readyToDrive = false;
         digitalWrite(readyToDriveLight, LOW);
     } else if (digitalRead(brakeLightSwitch) == HIGH) { // RTD switched on, and brake pedal pressed
         readyToDrive = true;
         digitalWrite(readyToDriveLight, HIGH);
+
+        soundTimer = 2;
+        digitalWrite(speaker, HIGH);
+    }
+}
+
+void timer() {
+    if (soundTimer == 0) {
+        digitalWrite(speaker, LOW);
+    } else {
+        soundTimer--;
     }
 }
 
