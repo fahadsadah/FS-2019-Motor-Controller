@@ -11,11 +11,11 @@
 #define motorOutput 5
 #define speaker 6
 #define readyToDriveLight 7
+#define implausibilityLight 8
 
 volatile int soundTimer = 0;
 volatile bool readyToDrive = false;
 volatile bool flash = false;
-bool plausible = false;
 
 void readyToDriveChange() {
     if (digitalRead(readyToDriveSwitch) == LOW) {
@@ -24,7 +24,8 @@ void readyToDriveChange() {
 
         readyToDrive = false;
         digitalWrite(readyToDriveLight, LOW);
-    } else if (digitalRead(brakeLightSwitch) == HIGH) { // RTD switched on, and brake pedal pressed
+    } else if (digitalRead(brakeLightSwitch) == HIGH && digitalRead(tractivePowerSensing) == HIGH) {
+        // RTD switched on, brake pedal pressed, TS on
         readyToDrive = true;
         digitalWrite(readyToDriveLight, HIGH);
 
@@ -48,16 +49,6 @@ void timer() {
             digitalWrite(speaker, LOW);
         }
     }
-
-    if (!plausible && readyToDrive) {
-        if (flash) {
-            digitalWrite(readyToDriveLight, HIGH);
-            flash = false;
-        } else {
-            digitalWrite(readyToDriveLight, LOW);
-            flash = true;
-        }
-    }
 }
 
 void setup() {
@@ -74,6 +65,7 @@ void setup() {
     pinMode(motorOutput, OUTPUT);
     pinMode(speaker, OUTPUT);
     pinMode(tractivePowerSensing, INPUT);
+    pinMode(implausibilityLight, OUTPUT);
 
     digitalWrite(brakeLightSwitch, LOW);
     digitalWrite(readyToDriveSwitch, LOW);
@@ -111,7 +103,7 @@ void loop() {
     int accelPot2 = analogRead(apps2); //Read pedal pot 2 voltage
     int powerReq = 0; //Set power requested to 0
 
-    plausible = plausibilityCheck(accelPot1, accelPot2);
+    bool plausible = plausibilityCheck(accelPot1, accelPot2);
     if (readyToDrive && plausible) {
         float accelPosition = accelPot2 * 0.136612021857924;
         float currentSensPerc = (((currentSens - V_25) / V_1075) * 100); //Calculate current draw %
@@ -123,7 +115,11 @@ void loop() {
         analogWrite(motorOutput, 0);
     }
 
-    if (!plausible) {
+    if (plausible) {
+        digitalWrite(implausibilityLight, LOW);
+    } else {
+        digitalWrite(implausibilityLight, HIGH);
+
         Serial.println("Implausible!");
         Serial.print(accelPot1); Serial.print(" "); Serial.print(accelPot2);
     }
