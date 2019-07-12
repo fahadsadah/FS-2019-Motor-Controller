@@ -13,6 +13,8 @@
 
 volatile int soundTimer = 0;
 volatile bool readyToDrive = false;
+volatile bool flash = false;
+bool plausible = false;
 
 void readyToDriveChange() {
     if (digitalRead(readyToDriveSwitch) == LOW) {
@@ -35,6 +37,16 @@ void timer() {
         soundTimer = soundTimer - 1;
         if (soundTimer == 0) {
             digitalWrite(speaker, LOW);
+        }
+    }
+
+    if (!plausible && readyToDrive) {
+        if (flash) {
+            digitalWrite(readyToDriveLight, HIGH);
+            flash = false;
+        } else {
+            digitalWrite(readyToDriveLight, LOW);
+            flash = true;
         }
     }
 }
@@ -66,6 +78,15 @@ void setup() {
     Serial.println("Hello");
 }
 
+bool plausibilityCheck(int pot1, int pot2) {
+    float pc1 = ((float) pot1 - 160) / 28.7;
+    float pc2 = (float) pot2 / 24.3;
+
+    float ratio = pc1 / pc2;
+
+    return (ratio > 0.9) && (ratio < 1.1);
+}
+
 void loop() {
     // put your main code here, to run repeatedly:
 
@@ -79,34 +100,20 @@ void loop() {
     int accelPot2 = analogRead(apps2); //Read pedal pot 2 voltage
     int powerReq = 0; //Set power requested to 0
 
-    float accelPot1Trav = ((accelPot1 / 1023.0) * 100); //Calculate pedal pot 1 travel %
-    float accelPot2Trav = ((accelPot2 / 1023.0) * 100); //Calculate pedal pot 2 travel %
-    float currentSensPerc = (((currentSens - V_25) / V_1075) * 100); //Calculate current draw %
+    plausible = plausibilityCheck(accelPot1, accelPot2);
+    if (readyToDrive && plausible) {
+        float accelPosition = accelPot2 * 0.136612021857924;
+        float currentSensPerc = (((currentSens - V_25) / V_1075) * 100); //Calculate current draw %
+        float powerReq1 = accelPosition - currentSensPerc;
+        powerReq = map(powerReq1, 0, 100, 184, 654); //0.9V to 3.2V
 
-    float powerReq1 = accelPot1Trav - currentSensPerc;//Calculate total requested current
-    powerReq = map(powerReq1, 0, 100, 184, 654); //0.9V to 3.2V
-
-    if (readyToDrive) {
         analogWrite(motorOutput, powerReq / 4);
+    } else {
+        analogWrite(motorOutput, 0);
     }
 
-    float vOut = powerReq * (5.0 / 1023);
-    float ped = accelPot1 * (5.0 / 1023);
-    float sens = currentSens * (5.0 / 1023);
-
-/*
-  Serial.print("Accel % = ");
-  Serial.println(ped);
-  Serial.print("Current Sensor % = ");
-  Serial.println(sens);
-  Serial.print("Power Delivery = ");
-  Serial.println(vOut);
-
-
-    Serial.print(ped);Serial.print(",");
-    Serial.print(sens);Serial.print(",");
-    Serial.print(vOut);Serial.println("");
-*/
-    delay(1000);
-
+    if (!plausible) {
+        Serial.println("Implausible!");
+        Serial.print(accelPot1); Serial.print(" "); Serial.print(accelPot2);
+    }
 }
