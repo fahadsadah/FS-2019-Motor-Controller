@@ -1,0 +1,3 @@
+[submodule "TimerOne"]
+	path = TimerOne
+	url = https://github.com/PaulStoffregen/TimerOne.git
