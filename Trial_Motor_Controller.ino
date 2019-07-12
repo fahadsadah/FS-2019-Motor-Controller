@@ -6,10 +6,11 @@
 #define apps2 2
 
 #define readyToDriveSwitch 2
-#define readyToDriveLight 3
+#define tractivePowerSensing 3
 #define brakeLightSwitch 4
 #define motorOutput 5
 #define speaker 6
+#define readyToDriveLight 7
 
 volatile int soundTimer = 0;
 volatile bool readyToDrive = false;
@@ -30,6 +31,14 @@ void readyToDriveChange() {
         soundTimer = 2;
         digitalWrite(speaker, HIGH);
     }
+}
+
+void lostTractivePower() {
+    analogWrite(motorOutput, 0); //cut the power
+    digitalWrite(speaker, LOW); //cancel the ready sound
+
+    readyToDrive = false;
+    digitalWrite(readyToDriveLight, LOW);
 }
 
 void timer() {
@@ -55,22 +64,24 @@ void setup() {
     // put your setup code here, to run once:
     Serial.begin(115200);
 
-    pinMode(A0, INPUT);
-    pinMode(A1, INPUT);
-    pinMode(A2, INPUT);
+    pinMode(analogInputToDigitalPin(currentSensor), INPUT);
+    pinMode(analogInputToDigitalPin(apps1), INPUT);
+    pinMode(analogInputToDigitalPin(apps2), INPUT);
 
     pinMode(readyToDriveSwitch, INPUT);
     pinMode(readyToDriveLight, OUTPUT);
     pinMode(brakeLightSwitch, INPUT);
     pinMode(motorOutput, OUTPUT);
     pinMode(speaker, OUTPUT);
+    pinMode(tractivePowerSensing, INPUT);
 
     digitalWrite(brakeLightSwitch, LOW);
     digitalWrite(readyToDriveSwitch, LOW);
 
     TCCR0B = TCCR0B & B11111000 | B00000001; // for PWM frequency of 62500.00 Hz
 
-    attachInterrupt(0, readyToDriveChange, CHANGE); //pin D2
+    attachInterrupt(digitalPinToInterrupt(readyToDriveSwitch), readyToDriveChange, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(tractivePowerSensing), lostTractivePower, FALLING);
 
     Timer1.initialize(1500000l);
     Timer1.attachInterrupt(timer);
